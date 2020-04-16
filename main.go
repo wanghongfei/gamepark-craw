@@ -2,17 +2,18 @@ package main
 
 import (
 	"fmt"
+	"gamepark-craw/crawl/steam"
 	"gamepark-craw/model"
-	"gamepark-craw/steam"
 	"log"
 	"os"
+	"time"
 )
 
 func main() {
 	initLog()
 
-	file, err := os.OpenFile("steam-20200415.tsv", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	// file, err := os.Create("steam.txt")
+	now := time.Now().Format("20060102")
+	file, err := os.OpenFile("out/steam-" + now + ".tsv2", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if nil != err {
 		log.Fatal(err)
 	}
@@ -21,7 +22,8 @@ func main() {
 	headLine := "游戏名\t现价\t原价\t打折幅度\n"
 	file.WriteString(headLine)
 
-	err = steam.CrawGameInfo(2073, func(info model.GameInfo) {
+	crawler := new(steam.Crawler)
+	err = crawler.CrawlGameInfo(1, func(info model.GameInfo) {
 		line := fmt.Sprintf("%s\t%d\t%d\t%d\n", info.Name, info.SteamPrice, info.SteamOriPrice, info.SteamDiscount)
 		_, werr := file.WriteString(line)
 		if nil != werr {

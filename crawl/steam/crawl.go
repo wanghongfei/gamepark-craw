@@ -2,6 +2,7 @@ package steam
 
 import (
 	"fmt"
+	"gamepark-craw/crawl"
 	"gamepark-craw/model"
 	"github.com/PuerkitoBio/goquery"
 	"log"
@@ -15,9 +16,12 @@ type Category struct {
 	Link string
 }
 
-type OnGameInfo func(info model.GameInfo)
+type Crawler struct {
 
-func CrawGameInfo(startPage int, onGameInfoFunc OnGameInfo) error {
+}
+
+
+func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo) error {
 	urlTemplate := "https://store.steampowered.com/search/?sort_by=Released_DESC&page=%d"
 	lastPage := -1
 	for page := startPage; ; page++ {
@@ -29,7 +33,7 @@ func CrawGameInfo(startPage int, onGameInfoFunc OnGameInfo) error {
 		}
 
 		link := fmt.Sprintf(urlTemplate, page)
-		bodyReader, err := GetWithRetry(link, 2)
+		bodyReader, err := crawl.GetWithRetry(link, 2)
 		if nil != err {
 			return fmt.Errorf("failed to request list page: %w", err)
 		}
@@ -115,18 +119,6 @@ func CrawGameInfo(startPage int, onGameInfoFunc OnGameInfo) error {
 
 
 	return nil
-}
-
-func findMaxPage(doc *goquery.Document) int {
-
-	maxPageStr := doc.Find("#NewReleases_links").Children().Last().Text()
-	fmt.Println(maxPageStr)
-
-	num, err := strconv.Atoi(maxPageStr)
-	if nil != err {
-		log.Println("invalid page string " + maxPageStr)
-	}
-	return num
 }
 
 func parsePrice(str string) (int, error) {

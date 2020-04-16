@@ -1,4 +1,4 @@
-package steam
+package crawl
 
 import (
 	"bytes"
