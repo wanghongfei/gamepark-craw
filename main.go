@@ -1,19 +1,23 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"gamepark-craw/crawl/steam"
 	"gamepark-craw/model"
 	"log"
 	"os"
-	"time"
 )
 
 func main() {
 	initLog()
 
-	now := time.Now().Format("20060102")
-	file, err := os.OpenFile("out/steam-" + now + ".tsv2", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	var outputFileName string
+	flag.StringVar(&outputFileName, "output", "steam.tsv", "output file path")
+	flag.Parse()
+
+	log.Printf("send data to %s\n", outputFileName)
+	file, err := os.OpenFile(outputFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if nil != err {
 		log.Fatal(err)
 	}
@@ -30,7 +34,6 @@ func main() {
 			log.Printf("failed to write data to file: %+v", werr)
 			panic(werr)
 		}
-		// fmt.Print(line)
 	})
 
 	if nil != err {
