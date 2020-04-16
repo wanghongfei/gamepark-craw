@@ -95,6 +95,9 @@ func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo)
 				log.Printf("invalid game price %s for %s: %+v\n", discountPercentStr, name, err)
 			}
 
+			// 抓取详情页面链接
+			detailLink, _ := s.Parent().Attr("href")
+			imgLink := extractBigImage(detailLink)
 
 			info := &model.GameInfo{
 				Name:       name,
@@ -103,6 +106,8 @@ func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo)
 				SteamPrice: discountPrice,
 				SteamOriPrice: oriPrice,
 				SteamDiscount: discountPercent,
+				SteamLink: detailLink,
+				SteamImgLink: imgLink,
 				EpicPrice:  0,
 			}
 
@@ -119,6 +124,24 @@ func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo)
 
 
 	return nil
+}
+
+func extractBigImage(url string) string {
+	bodyReader, err := crawl.GetWithRetry(url, 2)
+	if nil != err {
+		log.Printf("failed to open detail page:%v", err)
+		return ""
+	}
+
+	doc, err := goquery.NewDocumentFromReader(bodyReader)
+	if err != nil {
+		log.Printf("failed to parse detail page html: %v", err)
+		return ""
+	}
+
+	imgLink, _ := doc.Find(".game_header_image_full").Attr("src")
+	return imgLink
+
 }
 
 func parsePrice(str string) (int, error) {

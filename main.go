@@ -28,7 +28,7 @@ func main() {
 
 	crawler := new(steam.Crawler)
 	err = crawler.CrawlGameInfo(1, func(info model.GameInfo) {
-		line := fmt.Sprintf("%s\t%d\t%d\t%d\n", info.Name, info.SteamPrice, info.SteamOriPrice, info.SteamDiscount)
+		line := fmt.Sprintf("%s\t%d\t%d\t%d\t%s\t%s\n", info.Name, info.SteamPrice, info.SteamOriPrice, info.SteamDiscount, info.SteamLink, info.SteamImgLink)
 		_, werr := file.WriteString(line)
 		if nil != werr {
 			log.Printf("failed to write data to file: %+v", werr)

@@ -14,6 +14,8 @@ type GameInfo struct {
 	SteamPrice int
 	SteamOriPrice int
 	SteamDiscount int
+	SteamLink string
+	SteamImgLink string
 
 	EpicPrice int
 }
