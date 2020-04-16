@@ -55,6 +55,7 @@ func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo)
 
 		// 找到游戏节点
 		gameCounter := 0
+		detailParseResultChan := make(chan *model.GameInfo)
 		doc.Find("#search_result_container #search_resultsRows .responsive_search_name_combined").Each(func(i int, s *goquery.Selection) {
 			name := s.Find(".search_name .title").Text()
 			priceNode := s.Find(".search_price_discount_combined .search_price")
@@ -95,9 +96,8 @@ func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo)
 				log.Printf("invalid game price %s for %s: %+v\n", discountPercentStr, name, err)
 			}
 
-			// 抓取详情页面链接
+			// 详情页面链接
 			detailLink, _ := s.Parent().Attr("href")
-			imgLink := extractBigImage(detailLink)
 
 			info := &model.GameInfo{
 				Name:       name,
@@ -107,14 +107,28 @@ func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo)
 				SteamOriPrice: oriPrice,
 				SteamDiscount: discountPercent,
 				SteamLink: detailLink,
-				SteamImgLink: imgLink,
+				// SteamImgLink: imgLink,
 				EpicPrice:  0,
 			}
 
-			onGameInfoFunc(*info)
-			gameCounter++
+			// 抓取详情页的大图
+			go func(info *model.GameInfo, link string) {
+				imgLink := extractBigImage(link)
+				info.SteamImgLink = imgLink
 
+				detailParseResultChan <- info
+			}(info, detailLink)
+
+
+			gameCounter++
 		})
+
+		// 等待并发任务完成
+		for ix := 0; ix < gameCounter; ix++ {
+			info := <- detailParseResultChan
+			onGameInfoFunc(*info)
+		}
+		close(detailParseResultChan)
 
 		endTime := time.Now()
 		diffTime := endTime.Sub(startTime).Milliseconds()
