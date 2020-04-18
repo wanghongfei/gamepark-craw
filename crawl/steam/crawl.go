@@ -8,6 +8,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,21 +23,49 @@ type Crawler struct {
 
 var urlTemplate = "https://store.steampowered.com/search/?sort_by=Released_DESC&page=%d"
 
-func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo) error {
+func (cl *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onGameInfoFunc crawl.OnGameInfo) error {
 	// 获取最大页码
 	lastPage, err := fetchMaxPage()
 	if nil != err {
 		return err
 	}
 
+	// 任务队列
+	taskChan := make(chan int, concurrentPageAmount)
+
+	// 初始化协程池
+	wg := new(sync.WaitGroup)
+	for ix := 0; ix < concurrentPageAmount; ix++ {
+		wg.Add(1)
+		go crawlTaskRoutine(wg, ix + 1, taskChan, onGameInfoFunc)
+	}
+
+	// 开始投递任务
 	for page := startPage; page <= lastPage ; page++ {
+		taskChan <- page
+	}
+
+	// 关闭任务队列
+	close(taskChan)
+	// 等待任务全部结束
+	wg.Wait()
+
+	return nil
+}
+
+func crawlTaskRoutine(wg *sync.WaitGroup, id int, taskPageChan chan int, onGameInfoFunc crawl.OnGameInfo) {
+	log.Printf("routine %d started\n", id)
+
+	// 等待任务队列里的新任务
+	for page := range taskPageChan {
 		err := crawlLink(page, onGameInfoFunc)
 		if nil != err {
-			return err
+			log.Printf("failed to crawl page %d, skip\n", page)
 		}
 	}
 
-	return nil
+	log.Printf("routine %d exited\n", id)
+	wg.Done()
 }
 
 func fetchMaxPage() (int, error) {
@@ -69,7 +98,7 @@ func fetchMaxPage() (int, error) {
 func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 	startTime := time.Now()
 
-	log.Printf("current page: %d\n", page)
+	log.Printf("crawl page: %d\n", page)
 
 	link := fmt.Sprintf(urlTemplate, page)
 	bodyReader, err := crawl.GetWithRetry(link, 2)

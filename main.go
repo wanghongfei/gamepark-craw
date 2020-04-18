@@ -29,7 +29,7 @@ func main() {
 	file.WriteString(headLine)
 
 	crawler := new(steam.Crawler)
-	err = crawler.CrawlGameInfo(startPage, func(info model.GameInfo) {
+	err = crawler.CrawlGameInfo(startPage, 5, func(info model.GameInfo) {
 		line := fmt.Sprintf("%s\t%d\t%d\t%d\t%s\t%s\n", info.Name, info.SteamPrice, info.SteamOriPrice, info.SteamDiscount, info.SteamLink, info.SteamImgLink)
 		_, werr := file.WriteString(line)
 		if nil != werr {
