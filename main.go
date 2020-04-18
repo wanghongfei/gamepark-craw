@@ -13,10 +13,12 @@ func main() {
 	initLog()
 
 	var outputFileName string
+	var startPage int
 	flag.StringVar(&outputFileName, "output", "steam.tsv", "output file path")
+	flag.IntVar(&startPage, "start", 1, "start page")
 	flag.Parse()
 
-	log.Printf("send data to %s\n", outputFileName)
+	log.Printf("send data to %s, start page %d\n", outputFileName, startPage)
 	file, err := os.OpenFile(outputFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if nil != err {
 		log.Fatal(err)
@@ -27,7 +29,7 @@ func main() {
 	file.WriteString(headLine)
 
 	crawler := new(steam.Crawler)
-	err = crawler.CrawlGameInfo(1, func(info model.GameInfo) {
+	err = crawler.CrawlGameInfo(startPage, func(info model.GameInfo) {
 		line := fmt.Sprintf("%s\t%d\t%d\t%d\t%s\t%s\n", info.Name, info.SteamPrice, info.SteamOriPrice, info.SteamDiscount, info.SteamLink, info.SteamImgLink)
 		_, werr := file.WriteString(line)
 		if nil != werr {

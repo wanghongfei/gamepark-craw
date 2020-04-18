@@ -54,9 +54,18 @@ func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo)
 		}
 
 		// 找到游戏节点
+		gameNode := doc.Find("#search_result_container #search_resultsRows .responsive_search_name_combined")
+		if len(gameNode.Nodes) == 0 {
+			// 没找到游戏节点, 说明页面报错了或者改版了
+			log.Printf("no game found on page %s, retry\n", link)
+			page = page - 1
+			continue
+		}
+
+		// 遍历游戏节点
 		gameCounter := 0
 		detailParseResultChan := make(chan *model.GameInfo)
-		doc.Find("#search_result_container #search_resultsRows .responsive_search_name_combined").Each(func(i int, s *goquery.Selection) {
+		gameNode.Each(func(i int, s *goquery.Selection) {
 			name := s.Find(".search_name .title").Text()
 			priceNode := s.Find(".search_price_discount_combined .search_price")
 
