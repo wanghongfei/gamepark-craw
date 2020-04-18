@@ -1,4 +1,4 @@
-module gamepark-craw
+module github.com/wanghongfei/gamepark-craw
 
 go 1.14
 

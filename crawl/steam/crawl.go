@@ -2,9 +2,9 @@ package steam
 
 import (
 	"fmt"
-	"gamepark-craw/crawl"
-	"gamepark-craw/model"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/wanghongfei/gamepark-craw/crawl"
+	"github.com/wanghongfei/gamepark-craw/model"
 	"log"
 	"strconv"
 	"strings"
@@ -12,10 +12,6 @@ import (
 	"time"
 )
 
-type Category struct {
-	CategoryName string
-	Link string
-}
 
 type Crawler struct {
 
@@ -23,6 +19,10 @@ type Crawler struct {
 
 var urlTemplate = "https://store.steampowered.com/search/?sort_by=Released_DESC&page=%d"
 
+// 爬取steam搜索页面全部游戏数据;
+// 可以指定从startPage页开始爬取，startPage从1开始计算；
+// 可以指定最多同时爬取concurrentPageAmount个页面
+// onGameInfoFunc: 当爬取到一条完整的游戏信息时回调次函数
 func (cl *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onGameInfoFunc crawl.OnGameInfo) error {
 	// 获取最大页码
 	lastPage, err := fetchMaxPage()
@@ -173,7 +173,6 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 			SteamDiscount: discountPercent,
 			SteamLink: detailLink,
 			// SteamImgLink: imgLink,
-			EpicPrice:  0,
 		}
 
 		// 抓取详情页的大图

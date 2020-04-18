@@ -16,15 +16,5 @@ type GameInfo struct {
 	SteamDiscount int
 	SteamLink string
 	SteamImgLink string
-
-	EpicPrice int
 }
 
-type GamePrice struct {
-	PriceId int
-	GameId int
-	CreateTime time.Time
-
-	Price int
-	Platform int
-}
