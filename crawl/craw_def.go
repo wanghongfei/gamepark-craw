@@ -2,9 +2,12 @@ package crawl
 
 import "github.com/wanghongfei/gamepark-craw/model"
 
-// 爬取到一游戏信息时的回调函数
+// 爬取到一个完整游戏信息时的回调函数
 type OnGameInfo func(info model.GameInfo)
 
+// 爬取发生错误时的回调函数
+type OnGameError func(link string, err error)
+
 type GameCrawl interface {
-	CrawlGameInfo(startPage int, onGameInfoFunc OnGameInfo) error
+	CrawlGameInfo(int, OnGameInfo, OnGameError) error
 }

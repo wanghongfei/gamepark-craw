@@ -23,7 +23,7 @@ var urlTemplate = "https://store.steampowered.com/search/?sort_by=Released_DESC&
 // 可以指定从startPage页开始爬取，startPage从1开始计算；
 // 可以指定最多同时爬取concurrentPageAmount个页面
 // onGameInfoFunc: 当爬取到一条完整的游戏信息时回调次函数
-func (cl *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onGameInfoFunc crawl.OnGameInfo) error {
+func (cl *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onGameInfoFunc crawl.OnGameInfo, onGameError crawl.OnGameError) error {
 	// 获取最大页码
 	lastPage, err := fetchMaxPage()
 	if nil != err {
@@ -37,7 +37,7 @@ func (cl *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onGame
 	wg := new(sync.WaitGroup)
 	for ix := 0; ix < concurrentPageAmount; ix++ {
 		wg.Add(1)
-		go crawlTaskRoutine(wg, ix + 1, taskChan, onGameInfoFunc)
+		go crawlTaskRoutine(wg, ix + 1, taskChan, onGameInfoFunc, onGameError)
 	}
 
 	// 开始投递任务
@@ -53,7 +53,7 @@ func (cl *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onGame
 	return nil
 }
 
-func crawlTaskRoutine(wg *sync.WaitGroup, id int, taskPageChan chan int, onGameInfoFunc crawl.OnGameInfo) {
+func crawlTaskRoutine(wg *sync.WaitGroup, id int, taskPageChan chan int, onGameInfoFunc crawl.OnGameInfo, onError crawl.OnGameError) {
 	log.Printf("routine %d started\n", id)
 
 	// 等待任务队列里的新任务
@@ -61,6 +61,9 @@ func crawlTaskRoutine(wg *sync.WaitGroup, id int, taskPageChan chan int, onGameI
 		err := crawlLink(page, onGameInfoFunc)
 		if nil != err {
 			log.Printf("failed to crawl page %d, skip\n", page)
+
+			// 回调
+			onError(fmt.Sprintf(urlTemplate, page), err)
 		}
 	}
 
@@ -121,6 +124,7 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 	// 遍历游戏节点
 	gameCounter := 0
 	detailParseResultChan := make(chan *model.GameInfo)
+	var innerErr error
 	gameNode.Each(func(i int, s *goquery.Selection) {
 		name := s.Find(".search_name .title").Text()
 		priceNode := s.Find(".search_price_discount_combined .search_price")
@@ -150,15 +154,18 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 		// 解析价格
 		oriPrice, err := parsePrice(oriPriceStr)
 		if nil != err {
-			log.Printf("invalid game price %s for %s: %+v\n", oriPriceStr, name, err)
+			innerErr = fmt.Errorf("invalid game price %s for %s: %v\n", oriPriceStr, name, err)
+			return
 		}
 		discountPrice, err := parsePrice(discountPriceStr)
 		if nil != err {
-			log.Printf("invalid game price %s for %s: %+v\n", discountPriceStr, name, err)
+			innerErr = fmt.Errorf("invalid game price %s for %s: %v\n", discountPriceStr, name, err)
+			return
 		}
 		discountPercent, err := parsePrice(discountPercentStr)
 		if nil != err {
-			log.Printf("invalid game price %s for %s: %+v\n", discountPercentStr, name, err)
+			innerErr = fmt.Errorf("invalid game price %s for %s: %v\n", discountPercentStr, name, err)
+			return
 		}
 
 		// 详情页面链接
@@ -186,6 +193,9 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 
 		gameCounter++
 	})
+	if nil != innerErr {
+		return innerErr
+	}
 
 	// 等待并发任务完成
 	for ix := 0; ix < gameCounter; ix++ {
