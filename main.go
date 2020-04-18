@@ -25,7 +25,7 @@ func main() {
 	}
 	defer file.Close()
 
-	headLine := "游戏名\t现价\t原价\t打折幅度\n"
+	headLine := "游戏名\t现价\t原价\t打折幅度\t图片\t商店\n"
 	file.WriteString(headLine)
 
 	crawler := new(steam.Crawler)

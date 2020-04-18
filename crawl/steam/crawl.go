@@ -20,130 +20,155 @@ type Crawler struct {
 
 }
 
+var urlTemplate = "https://store.steampowered.com/search/?sort_by=Released_DESC&page=%d"
 
 func (cl *Crawler) CrawlGameInfo(startPage int, onGameInfoFunc crawl.OnGameInfo) error {
-	urlTemplate := "https://store.steampowered.com/search/?sort_by=Released_DESC&page=%d"
-	lastPage := -1
-	for page := startPage; ; page++ {
-		startTime := time.Now()
-
-		log.Printf("current page: %d\n", page)
-		if page == lastPage {
-			break
-		}
-
-		link := fmt.Sprintf(urlTemplate, page)
-		bodyReader, err := crawl.GetWithRetry(link, 2)
-		if nil != err {
-			return fmt.Errorf("failed to request list page: %w", err)
-		}
-
-		doc, err := goquery.NewDocumentFromReader(bodyReader)
-		if err != nil {
-			return fmt.Errorf("failed to parse steam list page html: %w", err)
-		}
-
-		if -1 == lastPage {
-			// 找出最大页码
-			lastPageStr := doc.Find("#search_result_container .search_pagination_right").Children().Last().Prev().Text()
-			log.Println("max page number is " + lastPageStr)
-			lastPage, err = strconv.Atoi(lastPageStr)
-			if nil != err {
-				return fmt.Errorf("invalid last page string: %w", err)
-			}
-		}
-
-		// 找到游戏节点
-		gameNode := doc.Find("#search_result_container #search_resultsRows .responsive_search_name_combined")
-		if len(gameNode.Nodes) == 0 {
-			// 没找到游戏节点, 说明页面报错了或者改版了
-			log.Printf("no game found on page %s, retry\n", link)
-			page = page - 1
-			continue
-		}
-
-		// 遍历游戏节点
-		gameCounter := 0
-		detailParseResultChan := make(chan *model.GameInfo)
-		gameNode.Each(func(i int, s *goquery.Selection) {
-			name := s.Find(".search_name .title").Text()
-			priceNode := s.Find(".search_price_discount_combined .search_price")
-
-			oriPriceStr := ""
-			discountPriceStr := ""
-			discountPercentStr := ""
-
-			// 判断是否打折
-			exist := priceNode.HasClass("discounted")
-			if exist {
-				// 原价
-				oriPriceStr = priceNode.Find("strike").Text()
-				priceNode.Find("span").Remove()
-				// 打折后价格
-				discountPriceStr = priceNode.Text()
-				// 打折幅度
-				discountPercentStr = priceNode.Prev().Find("span").Text()
-
-			} else {
-				oriPriceStr = priceNode.Text()
-				discountPriceStr = oriPriceStr
-				discountPercentStr = "0%"
-			}
-
-
-			// 解析价格
-			oriPrice, err := parsePrice(oriPriceStr)
-			if nil != err {
-				log.Printf("invalid game price %s for %s: %+v\n", oriPriceStr, name, err)
-			}
-			discountPrice, err := parsePrice(discountPriceStr)
-			if nil != err {
-				log.Printf("invalid game price %s for %s: %+v\n", discountPriceStr, name, err)
-			}
-			discountPercent, err := parsePrice(discountPercentStr)
-			if nil != err {
-				log.Printf("invalid game price %s for %s: %+v\n", discountPercentStr, name, err)
-			}
-
-			// 详情页面链接
-			detailLink, _ := s.Parent().Attr("href")
-
-			info := &model.GameInfo{
-				Name:       name,
-				CreateTime: time.Time{},
-				UpdateTime: time.Time{},
-				SteamPrice: discountPrice,
-				SteamOriPrice: oriPrice,
-				SteamDiscount: discountPercent,
-				SteamLink: detailLink,
-				// SteamImgLink: imgLink,
-				EpicPrice:  0,
-			}
-
-			// 抓取详情页的大图
-			go func(info *model.GameInfo, link string) {
-				imgLink := extractBigImage(link)
-				info.SteamImgLink = imgLink
-
-				detailParseResultChan <- info
-			}(info, detailLink)
-
-
-			gameCounter++
-		})
-
-		// 等待并发任务完成
-		for ix := 0; ix < gameCounter; ix++ {
-			info := <- detailParseResultChan
-			onGameInfoFunc(*info)
-		}
-		close(detailParseResultChan)
-
-		endTime := time.Now()
-		diffTime := endTime.Sub(startTime).Milliseconds()
-		log.Printf("done parsing %s, game count = %d, cost = %dms\n", link, gameCounter, diffTime)
-
+	// 获取最大页码
+	lastPage, err := fetchMaxPage()
+	if nil != err {
+		return err
 	}
+
+	for page := startPage; page <= lastPage ; page++ {
+		err := crawlLink(page, onGameInfoFunc)
+		if nil != err {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func fetchMaxPage() (int, error) {
+	log.Printf("getting max page")
+
+	link := fmt.Sprintf(urlTemplate, 1)
+	bodyReader, err := crawl.GetWithRetry(link, 2)
+	if nil != err {
+		return -1, fmt.Errorf("failed to request list page: %w", err)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(bodyReader)
+	if err != nil {
+		return -1, fmt.Errorf("failed to parse steam list page html: %w", err)
+	}
+
+	// 找出最大页码
+	lastPageStr := doc.Find("#search_result_container .search_pagination_right").Children().Last().Prev().Text()
+	log.Println("max page number is " + lastPageStr)
+	maxPage, err := strconv.Atoi(lastPageStr)
+	if nil != err {
+		return -1, fmt.Errorf("invalid last page string: %w", err)
+	}
+
+	return maxPage, nil
+
+}
+
+
+func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
+	startTime := time.Now()
+
+	log.Printf("current page: %d\n", page)
+
+	link := fmt.Sprintf(urlTemplate, page)
+	bodyReader, err := crawl.GetWithRetry(link, 2)
+	if nil != err {
+		return fmt.Errorf("failed to request list page: %w", err)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(bodyReader)
+	if err != nil {
+		return fmt.Errorf("failed to parse steam list page html: %w", err)
+	}
+
+	// 找到游戏节点
+	gameNode := doc.Find("#search_result_container #search_resultsRows .responsive_search_name_combined")
+	if len(gameNode.Nodes) == 0 {
+		// 没找到游戏节点, 说明页面报错了或者改版了
+		return fmt.Errorf("no game found on page %s", link)
+	}
+
+	// 遍历游戏节点
+	gameCounter := 0
+	detailParseResultChan := make(chan *model.GameInfo)
+	gameNode.Each(func(i int, s *goquery.Selection) {
+		name := s.Find(".search_name .title").Text()
+		priceNode := s.Find(".search_price_discount_combined .search_price")
+
+		oriPriceStr := ""
+		discountPriceStr := ""
+		discountPercentStr := ""
+
+		// 判断是否打折
+		exist := priceNode.HasClass("discounted")
+		if exist {
+			// 原价
+			oriPriceStr = priceNode.Find("strike").Text()
+			priceNode.Find("span").Remove()
+			// 打折后价格
+			discountPriceStr = priceNode.Text()
+			// 打折幅度
+			discountPercentStr = priceNode.Prev().Find("span").Text()
+
+		} else {
+			oriPriceStr = priceNode.Text()
+			discountPriceStr = oriPriceStr
+			discountPercentStr = "0%"
+		}
+
+
+		// 解析价格
+		oriPrice, err := parsePrice(oriPriceStr)
+		if nil != err {
+			log.Printf("invalid game price %s for %s: %+v\n", oriPriceStr, name, err)
+		}
+		discountPrice, err := parsePrice(discountPriceStr)
+		if nil != err {
+			log.Printf("invalid game price %s for %s: %+v\n", discountPriceStr, name, err)
+		}
+		discountPercent, err := parsePrice(discountPercentStr)
+		if nil != err {
+			log.Printf("invalid game price %s for %s: %+v\n", discountPercentStr, name, err)
+		}
+
+		// 详情页面链接
+		detailLink, _ := s.Parent().Attr("href")
+
+		info := &model.GameInfo{
+			Name:       name,
+			CreateTime: time.Time{},
+			UpdateTime: time.Time{},
+			SteamPrice: discountPrice,
+			SteamOriPrice: oriPrice,
+			SteamDiscount: discountPercent,
+			SteamLink: detailLink,
+			// SteamImgLink: imgLink,
+			EpicPrice:  0,
+		}
+
+		// 抓取详情页的大图
+		go func(info *model.GameInfo, link string) {
+			imgLink := extractBigImage(link)
+			info.SteamImgLink = imgLink
+
+			detailParseResultChan <- info
+		}(info, detailLink)
+
+
+		gameCounter++
+	})
+
+	// 等待并发任务完成
+	for ix := 0; ix < gameCounter; ix++ {
+		info := <- detailParseResultChan
+		onGameInfoFunc(*info)
+	}
+	close(detailParseResultChan)
+
+	endTime := time.Now()
+	diffTime := endTime.Sub(startTime).Milliseconds()
+	log.Printf("done parsing %s, game count = %d, cost = %dms\n", link, gameCounter, diffTime)
 
 
 	return nil
