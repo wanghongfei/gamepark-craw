@@ -1,6 +1,7 @@
 package steam
 
 import (
+	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/wanghongfei/gamepark-craw/crawl"
@@ -18,8 +19,10 @@ type Crawler struct {
 }
 
 var urlTemplate = "https://store.steampowered.com/search/?sort_by=Released_DESC&page=%d"
+var hotLink = "https://store.steampowered.com/stats/"
 
 var ERR_ACCESS_DENIED = fmt.Errorf("ACCESS DENIED!!!")
+
 
 // 爬取steam搜索页面全部游戏数据;
 // 可以指定从startPage页开始爬取，startPage从1开始计算；
@@ -53,6 +56,37 @@ func (cl *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onGame
 	wg.Wait()
 
 	return nil
+}
+
+// 爬取热门游戏
+// 返回游戏名称列表, 按热度排序
+func (cl *Crawler) CrawlHotGames() ([]string, error) {
+	log.Printf("getting host game page")
+
+	bodyReader, err := crawl.GetWithRetry(hotLink, 2)
+	if nil != err {
+		return nil, fmt.Errorf("failed to request hot game page: %w", err)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse steam host page html: %w", err)
+	}
+
+	// 找到游戏列表
+	gameNodes := doc.Find("#detailStats .gameLink")
+	if 0 == gameNodes.Length() {
+		return nil, errors.New("no hot game elements found")
+	}
+
+	names := make([]string, 0, gameNodes.Length())
+	gameNodes.Each(func(i int, selection *goquery.Selection) {
+		name := selection.Text()
+		names = append(names, name)
+	})
+
+	log.Printf("%d hot games found\n", gameNodes.Length())
+	return names, nil
 }
 
 func crawlTaskRoutine(wg *sync.WaitGroup, id int, taskPageChan chan int, onGameInfoFunc crawl.OnGameInfo, onError crawl.OnGameError) {

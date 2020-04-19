@@ -9,5 +9,9 @@ type OnGameInfo func(info model.GameInfo)
 type OnGameError func(link string, err error)
 
 type GameCrawl interface {
-	CrawlGameInfo(int, OnGameInfo, OnGameError) error
+	CrawlGameInfo(int, int, OnGameInfo, OnGameError) error
+}
+
+type HotGameCrawl interface {
+	CrawlHotGames() ([]string, error)
 }

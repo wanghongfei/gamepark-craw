@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/wanghongfei/gamepark-craw/crawl"
 	"github.com/wanghongfei/gamepark-craw/crawl/steam"
 	"github.com/wanghongfei/gamepark-craw/model"
 	"log"
@@ -11,7 +12,7 @@ import (
 
 func main() {
 	initLog()
-	log.Println("version 1.1")
+	log.Println("version 1.2")
 
 	// 命令行参数
 	var outputFileName string
@@ -59,13 +60,45 @@ func main() {
 	}
 
 	// 创建爬虫
-	crawler := new(steam.Crawler)
+	var crawler crawl.GameCrawl
+	crawler = new(steam.Crawler)
 	// 启动爬虫
 	err = crawler.CrawlGameInfo(startPage, concurrentPage, onSuccess, onFailed)
 
 	if nil != err {
 		log.Printf("%v", err)
 	}
+
+	// 爬取热门游戏列表
+	err = saveHotGames(crawler, outputFileName)
+	if nil != err {
+		log.Printf("%v", err)
+	}
+}
+
+func saveHotGames(crawler crawl.GameCrawl, hotFileName string) error {
+	// 爬取热门游戏列表
+	hotGameCrawler, ok := crawler.(crawl.HotGameCrawl)
+	if !ok {
+		return nil
+	}
+	hotGames, err := hotGameCrawler.CrawlHotGames()
+	if nil != err {
+		return fmt.Errorf("failed to crawl hot games, %v\n", err)
+	}
+
+	// 写入到热门文件
+	hotFiles, err := os.OpenFile(hotFileName + ".hot", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if nil != err {
+		return fmt.Errorf("failed to open hot file, %v", err)
+	}
+	defer hotFiles.Close()
+
+	for _, name := range hotGames {
+		hotFiles.WriteString(name + "\n")
+	}
+
+	return nil
 }
 
 func initLog()  {
