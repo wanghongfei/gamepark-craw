@@ -11,6 +11,7 @@ import (
 
 func main() {
 	initLog()
+	log.Println("version 1.1")
 
 	// 命令行参数
 	var outputFileName string

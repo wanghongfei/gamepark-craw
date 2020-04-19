@@ -19,6 +19,8 @@ type Crawler struct {
 
 var urlTemplate = "https://store.steampowered.com/search/?sort_by=Released_DESC&page=%d"
 
+var ERR_ACCESS_DENIED = fmt.Errorf("ACCESS DENIED!!!")
+
 // 爬取steam搜索页面全部游戏数据;
 // 可以指定从startPage页开始爬取，startPage从1开始计算；
 // 可以指定最多同时爬取concurrentPageAmount个页面
@@ -60,7 +62,11 @@ func crawlTaskRoutine(wg *sync.WaitGroup, id int, taskPageChan chan int, onGameI
 	for page := range taskPageChan {
 		err := crawlLink(page, onGameInfoFunc)
 		if nil != err {
-			log.Printf("failed to crawl page %d, skip\n", page)
+			log.Printf("failed to crawl page %d, %v skip\n", page, err)
+			if ERR_ACCESS_DENIED == err {
+				// 被封禁了, 退出
+				panic(err)
+			}
 
 			// 回调
 			onError(fmt.Sprintf(urlTemplate, page), err)
@@ -112,6 +118,12 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 	doc, err := goquery.NewDocumentFromReader(bodyReader)
 	if err != nil {
 		return fmt.Errorf("failed to parse steam list page html: %w", err)
+	}
+
+	// 判断有没有被封禁
+	title := doc.Find("title").Text()
+	if "Access Denied" == title {
+		return ERR_ACCESS_DENIED
 	}
 
 	// 找到游戏节点
