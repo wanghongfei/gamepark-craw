@@ -59,6 +59,7 @@ func Get(url string) (io.Reader, error) {
 }
 
 func addHeader(req *http.Request) {
-	req.Header.Add("Accept-Language", "h-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7")
+	req.Header.Add("Accept-Language", "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7")
+	//req.Header.Add("Accept-Language", "en-US;q=0.8,en;q=0.7")
 	req.Header.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36")
 }
