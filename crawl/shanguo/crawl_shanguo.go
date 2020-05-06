@@ -7,9 +7,11 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/chromedp"
 	"github.com/wanghongfei/gamepark-craw/crawl"
+	"github.com/wanghongfei/gamepark-craw/model"
 	"log"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const SHANGUO_PAGE = "https://www.sonkwo.com/store/search"
@@ -47,16 +49,52 @@ func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo 
 		}
 
 		// 游戏信息节点
+		infos := make([]*model.GameInfo, 0, 20)
 		gameHtmlNodes := doc.Find(".search-results li")
 		gameHtmlNodes.Each(func(i int, selection *goquery.Selection) {
+			// 游戏名
 			imgNode := selection.Find(".listed-game-img img")
 			gameName, _ := imgNode.Attr("title")
 
+			// 详情页地址
+			detailLink, _ := selection.Find(".listed-game-block").Attr("href")
+
+			// 价格
 			discountStr := selection.Find(".game-discount").Text()
 			oriPriceStr := selection.Find(".game-origin-price").Text()
 			nowPriceStr := selection.Find(".game-sale-price").Text()
 
-			log.Printf("%s\t%s\t%s\t%s\n", gameName, discountStr, oriPriceStr, nowPriceStr)
+			oriPrice, err := parsePrice(oriPriceStr)
+			if nil != err {
+				log.Printf("failed to parse ori price %s, %v\n", oriPriceStr, err)
+				return
+			}
+			nowPrice, err := parsePrice(nowPriceStr)
+			if nil != err {
+				log.Printf("failed to parse now price %s, %v\n", nowPriceStr, err)
+				return
+			}
+			discount, err := parseDiscount(discountStr)
+			if nil != err {
+				log.Printf("failed to parse discount %s, %v\n", discountStr, err)
+				return
+			}
+
+
+			info := &model.GameInfo{
+				GameId:        0,
+				Name:          gameName,
+				CreateTime:    time.Now(),
+				SgPrice:       nowPrice,
+				SgOriPrice:    oriPrice,
+				SgDiscount:    discount,
+				SgLink:        detailLink,
+			}
+
+			infos = append(infos, info)
+
+			onInfo(*info)
+			// log.Printf("%s\t%s\t%s\t%s\n", gameName, discountStr, oriPriceStr, nowPriceStr)
 		})
 	}
 
@@ -85,6 +123,27 @@ func (c *Crawler) fetchMaxPage() (int, error) {
 	}
 
 	return maxPage, nil
+}
+
+func parseDiscount(disStr string) (int, error) {
+	if "" == disStr {
+		return 0, nil
+	}
+
+	return strconv.Atoi(disStr[1:len(disStr) - 1])
+}
+
+func parsePrice(priceStr string) (int, error) {
+	if "" == priceStr {
+		return 0, nil
+	}
+
+	priceStr = strings.ReplaceAll(priceStr, "￥", "")
+
+	ptIdx := strings.Index(priceStr, ".")
+	numStr := priceStr[0:ptIdx]
+
+	return strconv.Atoi(numStr)
 }
 
 func initChromeContext() (context.Context, context.CancelFunc) {

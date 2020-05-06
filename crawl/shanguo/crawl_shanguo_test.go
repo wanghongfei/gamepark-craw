@@ -2,6 +2,8 @@ package shanguo
 
 import (
 	"fmt"
+	"github.com/wanghongfei/gamepark-craw/model"
+	"log"
 	"testing"
 )
 
@@ -36,6 +38,8 @@ func TestFetchMaxPage(t *testing.T) {
 
 func TestCrawler_CrawlGameInfo(t *testing.T) {
 	cl := new(Crawler)
-	cl.CrawlGameInfo(1, 1, nil, nil)
+	cl.CrawlGameInfo(1, 1, func(info model.GameInfo) {
+		log.Printf("%v\t%v\t%v\t%v\n", info.Name, info.SgDiscount, info.SgOriPrice, info.SgPrice)
+	}, nil)
 }
 
