@@ -20,6 +20,8 @@ const SHANGUO_PAGE = "https://www.sonkwo.com/store/search"
 type Crawler struct {
 	chromeContext context.Context
 	cancelFunc context.CancelFunc
+
+	withEngName bool
 }
 
 var SEARCH_RESULT_WAIT_EXPRESSION = `#content-wrapper > div > div.SK-store-search-container > div.search-block > div.search-left > ul > div > li:nth-child(1) > a > div.listed-game-content > p.tags > span:nth-child(1)`
@@ -84,20 +86,13 @@ func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo 
 				return
 			}
 
-			// 爬取英文名
 			if !strings.HasPrefix(detailLink, "http") {
 				detailLink = SHANGUO_HOST + detailLink
 			}
-			engName, err := c.fetchEngName(detailLink)
-			if nil != err {
-				log.Printf("failed to fetch eng name in page %s, %v\n", engName, err)
-				return
-			}
-
 
 			info := &model.GameInfo{
 				GameId:        0,
-				Name:		   engName,
+				// Name:		   '',
 				NameCn:        gameName,
 				CreateTime:    time.Now(),
 				SgPrice:       nowPrice,
@@ -105,6 +100,19 @@ func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo 
 				SgDiscount:    discount,
 				SgLink:        detailLink,
 			}
+
+			// 爬取英文名
+			if c.withEngName {
+				engName, err := c.fetchEngName(detailLink)
+				if nil != err {
+					log.Printf("failed to fetch eng name in page %s, %v\n", engName, err)
+					return
+				}
+
+				info.Name = engName
+			}
+
+
 
 			infos = append(infos, info)
 
