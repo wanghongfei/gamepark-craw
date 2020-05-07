@@ -31,7 +31,9 @@ func CrawlShanguo(outputFileName string, startPage int, concurrentPage int) {
 
 	// 创建爬虫
 	var crawler crawl.GameCrawl
-	crawler = new(Crawler)
+	crawler = &Crawler{
+		withEngName:   true,
+	}
 	// 启动爬虫
 	err = crawler.CrawlGameInfo(startPage, concurrentPage, onSuccess, nil)
 	if nil != err {
