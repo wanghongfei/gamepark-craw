@@ -1,12 +1,22 @@
-# Steam商店爬虫
+# Steam/杉果商店爬虫
 
 爬取Steam商店搜索页面上的全部游戏数据。使用方法：
 
 ```shell
-./gamepark-crawl -start 1 -concurrency 2 -output games.tsv
+Usage of ./gamepark-craw:
+  -concurrency int
+        page crawl concurrency (default 1)
+  -output string
+        output file path (default "steam.tsv")
+  -start int
+        start page (default 1)
+  -target string
+        target website, steam/shanguo (default "steam")
 ```
 
-其中`start`表示从第一页开始爬取, `concurrency`表示最多同时爬取2个页面, `output`用来指定输出文件。
+
+
+其中`start`表示从第一页开始爬取, `concurrency`表示最多同时爬取2个页面, `output`用来指定输出文件，`target`表示爬取的平台。
 
 游戏数据以`tsv`格式存储，一行有6个token, 每个token用`\t`分割，格式：
 

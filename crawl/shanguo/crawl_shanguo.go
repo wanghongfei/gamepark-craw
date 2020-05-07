@@ -9,6 +9,7 @@ import (
 	"github.com/wanghongfei/gamepark-craw/crawl"
 	"github.com/wanghongfei/gamepark-craw/model"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -181,38 +182,34 @@ func (c *Crawler) fetchHtml(link string) (string, error) {
 	return strings.TrimSpace(htmlContent), nil
 }
 
-func cc() {
-	//ctx := context.Background()
-	//options := []chromedp.ExecAllocatorOption{
-	//	chromedp.UserAgent(`Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36`),
-	//}
-	//options = append(options, chromedp.DefaultExecAllocatorOptions[:]...)
-	//
-	//c, cc := chromedp.NewExecAllocator(ctx, options...)
-	//defer cc()
-	// create context
-	ctx, cancel := initChromeContext()
-	defer cancel()
-
-	// run task list
-	var res string
-	//var ua string
-	// var res2 string
-	err := chromedp.Run(ctx,
-		chromedp.Navigate(`http://www.sonkwo.hk/store/search`),
-		// chromedp.WaitVisible(`#content-wrapper > div > div.SK-store-search-container > div.search-block > div.search-left > ul`),
-		chromedp.WaitVisible(`#content-wrapper > div > div.SK-store-search-container > div.search-block > div.search-left > ul > div > li:nth-child(1) > a > div.listed-game-content > p.tags > span:nth-child(1)`),
-		//chromedp.InnerHTML(`#content-wrapper > div > div.SK-store-search-container > div.search-block > div.search-left > ul > div > li:nth-child(1) > a > div.listed-game-content > p.tags > span:nth-child(1)`, &res),
-		// chromedp.Sleep(3 * time.Second),
-		// chromedp.OuterHTML(`#content-wrapper > div > div.SK-store-search-container > div.search-block > div.search-left > ul`, &res),
-		// chromedp.Sleep(10 * time.Second),
-		chromedp.OuterHTML(`document.querySelector("body")`, &res, chromedp.ByJSPath),
-	)
-	if err != nil {
+func CrawlShanguo(outputFileName string, startPage int, concurrentPage int) {
+	// 打开结果输出文件
+	log.Printf("send data to %s, start page %d, max concurrency page count %d, \n", outputFileName, startPage, concurrentPage)
+	file, err := os.OpenFile(outputFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if nil != err {
 		log.Fatal(err)
 	}
+	defer file.Close()
 
-	log.Println(strings.TrimSpace(res))
-	//log.Println(strings.TrimSpace(ua))
-	// log.Println(strings.TrimSpace(res2))
+	// 定义回调函数
+	// 成功函数
+	onSuccess := func(info model.GameInfo) {
+		// 输出到文件
+		line := fmt.Sprintf("%s\t%d\t%d\t%d\t%s\n", info.Name, info.SgPrice, info.SgOriPrice, info.SgDiscount, info.SgLink)
+		_, werr := file.WriteString(line)
+		if nil != werr {
+			log.Printf("failed to write data to file: %+v", werr)
+			panic(werr)
+		}
+	}
+
+	// 创建爬虫
+	var crawler crawl.GameCrawl
+	crawler = new(Crawler)
+	// 启动爬虫
+	err = crawler.CrawlGameInfo(startPage, concurrentPage, onSuccess, nil)
+	if nil != err {
+		log.Printf("%v", err)
+	}
+
 }
