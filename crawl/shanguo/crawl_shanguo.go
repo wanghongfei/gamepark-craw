@@ -185,15 +185,18 @@ func parsePrice(priceStr string) (int, error) {
 func initChromeContext() (context.Context, context.CancelFunc) {
 	ctx := context.Background()
 	options := []chromedp.ExecAllocatorOption{
+		chromedp.Flag("headless", false),
+		chromedp.Flag("blink-settings", "imagesEnabled=false"),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36`),
 	}
-	options = append(options, chromedp.DefaultExecAllocatorOptions[:]...)
+	// options = append(options, chromedp.DefaultExecAllocatorOptions[:]...)
+	options = append(chromedp.DefaultExecAllocatorOptions[:], options...)
 
 	c, _ := chromedp.NewExecAllocator(ctx, options...)
 	// defer cc()
 
 	// create context
-	return chromedp.NewContext(c)
+	return chromedp.NewContext(c, chromedp.WithLogf(log.Printf))
 }
 
 func (c *Crawler) fetchHtml(link string, waitExpression string) (string, error) {

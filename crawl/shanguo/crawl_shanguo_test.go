@@ -15,7 +15,7 @@ func TestCrawler_FetchHtml(t *testing.T) {
 	}
 	fmt.Println(content)
 
-	content, err = cl.fetchHtml("https://www.sonkwo.com/store/search?page=2", DETAIL_WAIT_EXPRESSION)
+	content, err = cl.fetchHtml("http://www.sonkwo.hk/sku/2925", DETAIL_WAIT_EXPRESSION)
 	if nil != err {
 		t.Fatal(err)
 	}
