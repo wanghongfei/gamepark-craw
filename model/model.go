@@ -8,6 +8,7 @@ const PLATFORM_EPIC = 2
 type GameInfo struct {
 	GameId int
 	Name string
+	NameCn string
 	CreateTime time.Time
 	UpdateTime time.Time
 

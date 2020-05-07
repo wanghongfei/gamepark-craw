@@ -9,18 +9,21 @@ import (
 	"github.com/wanghongfei/gamepark-craw/crawl"
 	"github.com/wanghongfei/gamepark-craw/model"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
+const SHANGUO_HOST = "https://www.sonkwo.com"
 const SHANGUO_PAGE = "https://www.sonkwo.com/store/search"
 
 type Crawler struct {
 	chromeContext context.Context
 	cancelFunc context.CancelFunc
 }
+
+var SEARCH_RESULT_WAIT_EXPRESSION = `#content-wrapper > div > div.SK-store-search-container > div.search-block > div.search-left > ul > div > li:nth-child(1) > a > div.listed-game-content > p.tags > span:nth-child(1)`
+var DETAIL_WAIT_EXPRESSION = `#content-wrapper > div > div > div.new-content-container > div`
 
 func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo crawl.OnGameInfo, onError crawl.OnGameError) error {
 	maxPage, err := c.fetchMaxPage()
@@ -34,7 +37,7 @@ func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo 
 
 		// 爬取页面完整html
 		link := SHANGUO_PAGE + "?page=" + strconv.Itoa(page)
-		pageHtml, err := c.fetchHtml(link)
+		pageHtml, err := c.fetchHtml(link, SEARCH_RESULT_WAIT_EXPRESSION)
 		if nil != err {
 			log.Printf("failed to visit page %s, %v\n", link, err)
 			continue
@@ -81,10 +84,21 @@ func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo 
 				return
 			}
 
+			// 爬取英文名
+			if !strings.HasPrefix(detailLink, "http") {
+				detailLink = SHANGUO_HOST + detailLink
+			}
+			engName, err := c.fetchEngName(detailLink)
+			if nil != err {
+				log.Printf("failed to fetch eng name in page %s, %v\n", engName, err)
+				return
+			}
+
 
 			info := &model.GameInfo{
 				GameId:        0,
-				Name:          gameName,
+				Name:		   engName,
+				NameCn:        gameName,
 				CreateTime:    time.Now(),
 				SgPrice:       nowPrice,
 				SgOriPrice:    oriPrice,
@@ -95,15 +109,28 @@ func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo 
 			infos = append(infos, info)
 
 			onInfo(*info)
-			// log.Printf("%s\t%s\t%s\t%s\n", gameName, discountStr, oriPriceStr, nowPriceStr)
 		})
 	}
 
 	return nil
 }
 
+func (c *Crawler) fetchEngName(link string) (string, error) {
+	detailHtml, err := c.fetchHtml(link, DETAIL_WAIT_EXPRESSION)
+	if nil != err {
+		return "", fmt.Errorf("failed to fetch eng name, %w", err)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader([]byte(detailHtml)))
+	if nil != err {
+		return "", fmt.Errorf("failed to parse detail page, %w", err)
+	}
+
+	return doc.Find(".typical-name-2").Text(), nil
+}
+
 func (c *Crawler) fetchMaxPage() (int, error) {
-	pageHtml, err := c.fetchHtml(SHANGUO_PAGE)
+	pageHtml, err := c.fetchHtml(SHANGUO_PAGE, SEARCH_RESULT_WAIT_EXPRESSION)
 	if nil != err {
 		return 0, err
 	}
@@ -161,7 +188,7 @@ func initChromeContext() (context.Context, context.CancelFunc) {
 	return chromedp.NewContext(c)
 }
 
-func (c *Crawler) fetchHtml(link string) (string, error) {
+func (c *Crawler) fetchHtml(link string, waitExpression string) (string, error) {
 	if nil == c.chromeContext {
 		log.Println("init chrome")
 		c.chromeContext, c.cancelFunc = initChromeContext()
@@ -172,44 +199,13 @@ func (c *Crawler) fetchHtml(link string) (string, error) {
 	var htmlContent string
 	err := chromedp.Run(c.chromeContext,
 		chromedp.Navigate(link),
-		chromedp.WaitVisible(`#content-wrapper > div > div.SK-store-search-container > div.search-block > div.search-left > ul > div > li:nth-child(1) > a > div.listed-game-content > p.tags > span:nth-child(1)`),
+		chromedp.WaitVisible(waitExpression),
 		chromedp.OuterHTML(`document.querySelector("body")`, &htmlContent, chromedp.ByJSPath),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return "", nil
 	}
 
 	return strings.TrimSpace(htmlContent), nil
 }
 
-func CrawlShanguo(outputFileName string, startPage int, concurrentPage int) {
-	// 打开结果输出文件
-	log.Printf("send data to %s, start page %d, max concurrency page count %d, \n", outputFileName, startPage, concurrentPage)
-	file, err := os.OpenFile(outputFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-	if nil != err {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	// 定义回调函数
-	// 成功函数
-	onSuccess := func(info model.GameInfo) {
-		// 输出到文件
-		line := fmt.Sprintf("%s\t%d\t%d\t%d\t%s\n", info.Name, info.SgPrice, info.SgOriPrice, info.SgDiscount, info.SgLink)
-		_, werr := file.WriteString(line)
-		if nil != werr {
-			log.Printf("failed to write data to file: %+v", werr)
-			panic(werr)
-		}
-	}
-
-	// 创建爬虫
-	var crawler crawl.GameCrawl
-	crawler = new(Crawler)
-	// 启动爬虫
-	err = crawler.CrawlGameInfo(startPage, concurrentPage, onSuccess, nil)
-	if nil != err {
-		log.Printf("%v", err)
-	}
-
-}

@@ -7,19 +7,15 @@ import (
 	"testing"
 )
 
-func TestCC(t *testing.T) {
-	cc()
-}
-
 func TestCrawler_FetchHtml(t *testing.T) {
 	cl := new(Crawler)
-	content, err := cl.fetchHtml("https://www.sonkwo.com/store/search")
+	content, err := cl.fetchHtml("https://www.sonkwo.com/store/search", SEARCH_RESULT_WAIT_EXPRESSION)
 	if nil != err {
 		t.Fatal(err)
 	}
 	fmt.Println(content)
 
-	content, err = cl.fetchHtml("https://www.sonkwo.com/store/search?page=2")
+	content, err = cl.fetchHtml("https://www.sonkwo.com/store/search?page=2", DETAIL_WAIT_EXPRESSION)
 	if nil != err {
 		t.Fatal(err)
 	}
