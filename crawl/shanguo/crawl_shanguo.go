@@ -61,6 +61,7 @@ func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo 
 			// 游戏名
 			imgNode := selection.Find(".listed-game-img img")
 			gameName, _ := imgNode.Attr("title")
+			gameName = strings.TrimSpace(gameName)
 
 			// 详情页地址
 			detailLink, _ := selection.Find(".listed-game-block").Attr("href")
@@ -185,7 +186,7 @@ func parsePrice(priceStr string) (int, error) {
 func initChromeContext() (context.Context, context.CancelFunc) {
 	ctx := context.Background()
 	options := []chromedp.ExecAllocatorOption{
-		chromedp.Flag("headless", false),
+		// chromedp.Flag("headless", false), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36`),
 	}
