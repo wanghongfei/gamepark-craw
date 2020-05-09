@@ -184,32 +184,42 @@ func parsePrice(priceStr string) (int, error) {
 }
 
 func initChromeContext() (context.Context, context.CancelFunc) {
-	ctx := context.Background()
 	options := []chromedp.ExecAllocatorOption{
-		// chromedp.Flag("headless", false), // debug使用
+		chromedp.Flag("headless", false), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36`),
 	}
-	// options = append(options, chromedp.DefaultExecAllocatorOptions[:]...)
 	options = append(chromedp.DefaultExecAllocatorOptions[:], options...)
 
-	c, _ := chromedp.NewExecAllocator(ctx, options...)
-	// defer cc()
+	c, _ := chromedp.NewExecAllocator(context.Background(), options...)
+	// defer allocatorCancel()
 
 	// create context
-	return chromedp.NewContext(c, chromedp.WithLogf(log.Printf))
+	chromeCtx, cancel := chromedp.NewContext(c, chromedp.WithLogf(log.Printf))
+	// 执行一个空task, 用提前创建Chrome实例
+	chromedp.Run(chromeCtx, make([]chromedp.Action, 0, 1)...)
+
+	return chromeCtx, cancel
 }
 
 func (c *Crawler) fetchHtml(link string, waitExpression string) (string, error) {
+	// 如果是第一次调用
 	if nil == c.chromeContext {
+		// 初始化chrome
 		log.Println("init chrome")
 		c.chromeContext, c.cancelFunc = initChromeContext()
+		log.Println("done initialization")
 	}
+
+	// 给每个页面的爬取设置超时时间
+	timeoutCtx, cancel := context.WithTimeout(c.chromeContext, 10 * time.Second)
+	defer cancel()
+
 
 	log.Printf("Chrome visit page %s\n", link)
 
 	var htmlContent string
-	err := chromedp.Run(c.chromeContext,
+	err := chromedp.Run(timeoutCtx,
 		chromedp.Navigate(link),
 		chromedp.WaitVisible(waitExpression),
 		chromedp.OuterHTML(`document.querySelector("body")`, &htmlContent, chromedp.ByJSPath),
