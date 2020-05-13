@@ -121,13 +121,17 @@ func (c *Crawler) CrawlGameInfo(startPage int, concurrentPageAmount int, onInfo 
 		})
 	}
 
+	c.cancelFunc()
+	c.chromeContext = nil
+	c.cancelFunc = nil
+
 	return nil
 }
 
 func (c *Crawler) fetchEngName(link string) (string, error) {
 	detailHtml, err := c.fetchHtml(link, DETAIL_WAIT_EXPRESSION)
 	if nil != err {
-		return "", fmt.Errorf("failed to fetch eng name, %w", err)
+		return "", fmt.Errorf("failed to fetch eng name in link %s, %w", link, err)
 	}
 
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader([]byte(detailHtml)))
@@ -185,7 +189,7 @@ func parsePrice(priceStr string) (int, error) {
 
 func initChromeContext() (context.Context, context.CancelFunc) {
 	options := []chromedp.ExecAllocatorOption{
-		chromedp.Flag("headless", false), // debug使用
+		//chromedp.Flag("headless", false), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36`),
 	}
@@ -212,7 +216,7 @@ func (c *Crawler) fetchHtml(link string, waitExpression string) (string, error) 
 	}
 
 	// 给每个页面的爬取设置超时时间
-	timeoutCtx, cancel := context.WithTimeout(c.chromeContext, 10 * time.Second)
+	timeoutCtx, cancel := context.WithTimeout(c.chromeContext, 30 * time.Second)
 	defer cancel()
 
 
@@ -225,9 +229,9 @@ func (c *Crawler) fetchHtml(link string, waitExpression string) (string, error) 
 		chromedp.OuterHTML(`document.querySelector("body")`, &htmlContent, chromedp.ByJSPath),
 	)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
-	return strings.TrimSpace(htmlContent), nil
+	return htmlContent, nil
 }
 
