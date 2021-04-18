@@ -20,6 +20,7 @@ func main() {
 	flag.StringVar(&outputFileName, "output", "steam.tsv", "output file path")
 	flag.IntVar(&startPage, "start", 1, "start page")
 	flag.IntVar(&concurrentPage, "concurrency", 1, "page crawl concurrency")
+	// flag.IntVar(&concurrentPage, "imageconcurrency", 1, "page crawl concurrency")
 	flag.StringVar(&target, "target", "steam", "target website, steam/shanguo")
 	flag.Parse()
 

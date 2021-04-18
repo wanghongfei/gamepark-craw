@@ -167,9 +167,16 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 		return fmt.Errorf("no game found on page %s", link)
 	}
 
+	detailParseResultChan := make(chan *model.GameInfo, 3 * gameNode.Length())
+	// 启动大图抓取routine
+	imageTaskChan := make(chan *model.GameInfo, 3)
+	for ix := 0; ix < 3; ix++ {
+		go extractBigImageRoutine(imageTaskChan, detailParseResultChan)
+	}
+	fmt.Printf("%v image routine started\n", 3)
+
 	// 遍历游戏节点
 	gameCounter := 0
-	detailParseResultChan := make(chan *model.GameInfo)
 	var innerErr error
 	gameNode.Each(func(i int, s *goquery.Selection) {
 		name := s.Find(".search_name .title").Text()
@@ -228,13 +235,15 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 			// SteamImgLink: imgLink,
 		}
 
-		// 抓取详情页的大图
-		go func(info *model.GameInfo, link string) {
-			imgLink := extractBigImage(link)
-			info.SteamImgLink = imgLink
+		// 投递抓取详情页的大图按任务
+		imageTaskChan <- info
 
-			detailParseResultChan <- info
-		}(info, detailLink)
+		//go func(info *model.GameInfo, link string) {
+		//	imgLink := extractBigImage(link)
+		//	info.SteamImgLink = imgLink
+		//
+		//	detailParseResultChan <- info
+		//}(info, detailLink)
 
 
 		gameCounter++
@@ -242,6 +251,8 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 	if nil != innerErr {
 		return innerErr
 	}
+
+	close(imageTaskChan)
 
 	// 等待并发任务完成
 	for ix := 0; ix < gameCounter; ix++ {
@@ -256,6 +267,13 @@ func crawlLink(page int, onGameInfoFunc crawl.OnGameInfo) error {
 
 
 	return nil
+}
+
+func extractBigImageRoutine(taskChan chan *model.GameInfo, resultChan chan *model.GameInfo) {
+	for info := range taskChan {
+		info.SteamImgLink = extractBigImage(info.SteamLink)
+		resultChan <- info
+	}
 }
 
 func extractBigImage(url string) string {
