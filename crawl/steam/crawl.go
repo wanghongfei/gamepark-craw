@@ -310,11 +310,11 @@ func parsePrice(str string) (int, error) {
 
 	priceIndex := strings.LastIndex(str, "¥")
 	priceToken := strings.TrimSpace(str[priceIndex + 2:])
-	price, err := strconv.Atoi(priceToken)
+	price, err := strconv.ParseFloat(priceToken, 64)
 	if nil != err {
 		return -2, fmt.Errorf("invalid price string: %w", err)
 	}
 
-	return price, nil
+	return int(price), nil
 }
 
